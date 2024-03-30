@@ -7,5 +7,5 @@ assetQuantity = 0
 assetValue = 0
 cashValue = 0
 
-
+def insertValue(timestamp, )
 
