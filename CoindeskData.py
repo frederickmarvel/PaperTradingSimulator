@@ -13,7 +13,7 @@ db_user = os.getenv('DB_USER')
 db_password = os.getenv('DB_PASSWORD')
 db_name = os.getenv('DB_NAME')
 
-logger = getLogger(__name__)  # Initialize logger
+logger = getLogger(__name__) 
 
 conn = pymysql.connect(
     host=os.getenv('DB_HOST'),
@@ -28,7 +28,7 @@ def insertData():
     xbx_url = "https://cdi-website-three.vercel.app/indices/api/v1/trend-indicator?symbol=xbx&history=true"
     try:
         response = requests.get(xbx_url)
-        response.raise_for_status()  # Raise an exception for unsuccessful requests (status codes not in 2xx range)
+        response.raise_for_status()  
         data = response.json()['data']
         for item in data:
             try:
