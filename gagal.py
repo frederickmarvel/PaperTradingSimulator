@@ -57,19 +57,27 @@ def getValue(timestamp):
 # print(getValue(1514840400))
 
 def getBalanceAsset(timestamp):
-    cursor.execute('SELECT * FROM balanceAsset WHERE timestamp = %s', (timestamp,))
-    row = cursor.fetchone()
-    conn.close()
-    return row
+    with create_connection() as conn:
+        if conn is not None:
+            try:
+                with conn.cursor() as cursor:
+                    cursor.execute('SELECT * FROM balanceAsset WHERE timestamp = %s', (timestamp,))
+                    row = cursor.fetchone()
+                    return row
+            except err.MySQLError as e:
+                logger.error(f"Database query failed: {e}")
+                return None
+        else:
+            logger.error("Failed to create database connection.")
+            return None
 
+# def currentTrend(timestamp):
+#     request = getValue(timestamp)
+#     return request[3]
 
-def currentTrend(timestamp):
-    request = getValue(timestamp)
-    return request[3]
-
-def btcPrice(timestamp):
-    request = getValue(timestamp)
-    return request[2]
+# def btcPrice(timestamp):
+#     request = getValue(timestamp)
+#     return request[2]
 
 # print(currentTrend(1514840400))
 # print(btcPrice(1514840400))
@@ -80,7 +88,7 @@ def rebalancePortfolio(target_btc_ratio, timestamp, usdtBalance, btcBalance):
         return  # Skip this timestamp
 
     current_btc_price = value[2]
-    total_value = usdtBalance + (int(btcBalance) * int(current_btc_price))  
+    total_value = float(usdtBalance) + (float(btcBalance) * float(current_btc_price))  
 
     target_btc_value = total_value * target_btc_ratio
     target_usdt_value = total_value * (1 - target_btc_ratio)
@@ -113,3 +121,51 @@ def rebalancePortfolio(target_btc_ratio, timestamp, usdtBalance, btcBalance):
                 logger.error(f"Failed to insert rebalanced portfolio data: {e}")
 
 rebalancePortfolio(0.5, 1514840400, 100000, 0)
+
+# rebalancePortfolio(0.5, 1514840400, 100000, 0)
+# updateBitcoinValue(1514926800, 3.1514926800, 14840.6)
+def strategy1():
+    lastTimestamp = 1514840400
+    value = getBalanceAsset(lastTimestamp)
+    if value is None:
+        logger.error("No initial balance asset data found. Exiting strategy.")
+        return
+
+    lastUsdtBalance = value[2]
+    lastBitcoinBalance = value[3]
+    currentTimestamp = lastTimestamp + 86400
+    
+    for i in range(currentTimestamp, 1711656000 + 1, 86400):
+        prevValue = getValue(i-86400)
+        currentValue = getValue(i)
+
+        # Ensure we have valid data before proceeding
+        if prevValue is None or currentValue is None:
+            logger.error(f"Data for timestamp {i} or {i-86400} is missing. Skipping this iteration.")
+            continue
+
+        lastTrend = prevValue[3]
+        currentTrendValue = currentValue[3]
+
+        if lastTrend == currentTrendValue:
+            last_data = getBalanceAsset(i - 86400)
+            if last_data:
+                last_usdtBalance = last_data[2]
+                last_bitcoinBalance = last_data[3]
+                currentBitcoinPrice = currentValue[2]
+                new_bitcoinValue = float(last_bitcoinBalance) * float(currentBitcoinPrice)
+                currentAssetValue = float(new_bitcoinValue) + float(last_usdtBalance)
+                
+                # Database update logic here...
+        else:
+            btc_bal = getBalanceAsset(i - 86400)[3] if getBalanceAsset(i - 86400) else 0
+            usdt_bal = getBalanceAsset(i - 86400)[2] if getBalanceAsset(i - 86400) else 0
+
+            # Now rebalance based on the trend
+            if currentTrendValue in [0, -0.5, 0.5]:
+                rebalancePortfolio(0.5, i, usdt_bal, btc_bal)
+            elif currentTrendValue == 1:
+                rebalancePortfolio(1.0, i, usdt_bal, btc_bal)
+            elif currentTrendValue == -1:
+                rebalancePortfolio(0, i, usdt_bal, btc_bal)
+# strategy1()
